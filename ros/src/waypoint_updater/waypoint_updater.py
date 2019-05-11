@@ -55,8 +55,8 @@ class WaypointUpdater(object):
         Subscriber('/current_pose', PoseStamped, self.pose_cb)
         Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
-        Subscriber('/traffic_waypoint', Lane, self.traffic_cb ) #TODO check this is the right type
-        Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb ) 
+        #Subscriber('/traffic_waypoint', Lane, self.traffic_cb ) #TODO check this is the right type
+        #Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb ) 
         #TODO: check this is the right type 
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
@@ -80,12 +80,12 @@ class WaypointUpdater(object):
         """Get idx of closest waypoint that is ahead"""
         posx = self.pose.pose.position.x
         posy = self.pose.pose.position.y
-        closest_idx = self.waypoint_tree.query( [posx,posy], 1)[1]
-        closest_v = np.array( self.waypoints_2d[closest_idx] )
+        closest_idx = self.waypoint_tree.query( [posx, posy], 1)[1]
+        cls_v = np.array( self.waypoints_2d[closest_idx] )
         prv_v = np.array( self.waypoints_2d[closest_idx - 1] )
         pos_v = np.array([posx, posy])
 
-        val = np.dot( closest_v - prv_v, pos_v - closest_v )
+        val = np.dot( cls_v - prv_v, pos_v - cls_v )
 
         if val > 0 :
             closest_idx = (closest_idx + 1) % len( self.waypoints_2d )
@@ -105,14 +105,15 @@ class WaypointUpdater(object):
         """Update the pose"""
         self.pose = msg
 
-    def waypoints_cb(self, waypoints):
+    def waypoints_cb(self, msg):
         """ waypoints contains all waypoint in the track both before and after vehicle """
         
-        self.waypoints = waypoints
+        self.waypoints = msg.waypoints
+        print( "received waypoints: %d " % (len(self.waypoints)) )
         if not self.waypoint_tree :
             self.waypoints_2d = [[waypoint.pose.pose.position.x,
                                   waypoint.pose.pose.position.y]
-                                 for waypoint in waypoints]
+                                 for waypoint in self.waypoints]
             self.waypoint_tree = KDTree( self.waypoints_2d )
 
     def traffic_cb(self, msg):
