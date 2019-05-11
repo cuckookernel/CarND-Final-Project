@@ -51,7 +51,6 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        
         Subscriber('/current_pose', PoseStamped, self.pose_cb)
         Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
