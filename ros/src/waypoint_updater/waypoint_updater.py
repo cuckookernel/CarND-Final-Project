@@ -16,12 +16,15 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 #pylint: disable=C0326,trailing-whitespace
 import math
+import numpy as np
+
+from scipy.spatial import KDTree
 
 import rospy
 from rospy import Subscriber
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane #, Waypoint
-from scipy.spatial import KDTree
+
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 
@@ -48,11 +51,7 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        self.waypoints = None
-        self.waypoints_2d = None
-        self.pose = None
-        self.waypoints_tree = None
-
+        
         Subscriber('/current_pose', PoseStamped, self.pose_cb)
         Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -62,9 +61,37 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        self.pose = None
+        self.waypoints = None
+        self.waypoints_2d = []
+        self.waypoint_tree = None
 
-        rospy.spin()
+        self.loop()
+
+    def loop(self):
+        "run"
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown() :
+            if self.pose and self.waypoints:
+                self.closest_wp_idx = self.get_closest_wp_idx()
+            rate.sleep()
+
+    def get_closest_wp_idx(self) :
+        """Get idx of closest waypoint that is ahead"""
+        posx = self.pose.pose.position.x
+        posy = self.pose.pose.position.y
+        closest_idx = self.waypoint_tree.query( [posx,posy], 1)[1]
+        closest_v = np.array( self.waypoints_2d[closest_idx] )
+        prv_v = np.array( self.waypoints_2d[closest_idx - 1] )
+        pos_v = np.array([posx, posy])
+
+        val = np.dot( closest_v - prv_v, pos_v - closest_v )
+
+        if val > 0 :
+            closest_idx = (closest_idx + 1) % len( self.waypoints_2d )
+
+        return closest_idx
+        
 
     def publish_waypoints( self, closest_idx ) :
         """Publish the first LOOKAHEAD_WPS"""
@@ -74,7 +101,6 @@ class WaypointUpdater(object):
         lane.waypoints = self.waypoints[ closest_idx : closest_idx + LOOKAHEAD_WPS]
         self.final_waypoints_pub.publish( lane )
 
-
     def pose_cb(self, msg):
         """Update the pose"""
         self.pose = msg
@@ -83,10 +109,11 @@ class WaypointUpdater(object):
         """ waypoints contains all waypoint in the track both before and after vehicle """
         
         self.waypoints = waypoints
-        if not self.waypoints_tree :
-            waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y]
-                             for waypoint in waypoints]
-            self.waypoints_tree = KDTree( waypoints_2d )
+        if not self.waypoint_tree :
+            self.waypoints_2d = [[waypoint.pose.pose.position.x,
+                                  waypoint.pose.pose.position.y]
+                                 for waypoint in waypoints]
+            self.waypoint_tree = KDTree( self.waypoints_2d )
 
     def traffic_cb(self, msg):
         """if a traffic light is nearby..."""
@@ -97,11 +124,6 @@ class WaypointUpdater(object):
         """if an obstacle is nearby"""
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
-
-    
-    
-
-
 
 
 if __name__ == '__main__':
