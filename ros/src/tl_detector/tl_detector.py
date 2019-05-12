@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Detect and classify upcoming traffic lights"""
 # pylint: disable=bad-whitespace, trailing-whitespace
+import datetime as dt 
 from scipy.spatial import KDTree
 
 import rospy
@@ -17,6 +18,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 TESTING = True
+CAPTURE_IMAGES = True
 
 
 class TLDetector(object):
@@ -58,19 +60,21 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.img_cnt = 0 
 
         rospy.spin()
 
     def pose_cb(self, msg):
         """Record cars pose from /current_pose topic"""
-        pose = msg.pose.pose
+        pose = msg.pose
         self.pos_xy = [ pose.position.x, pose.position.y ]
 
     def waypoints_cb(self, waypoints_msg):
         """Get full list of waypoints from the single message that 
         comes over /base_waypoints"""
         self.waypoints = waypoints_msg.waypoints
-        wps_2d = [ [wp.position.x, wp.position.y] for wp in self.waypoints ]
+        wps_2d = [ [wp.pose.pose.position.x, wp.pose.pose.position.y] 
+                   for wp in self.waypoints ]
         self.waypoints_tree = KDTree(wps_2d)
 
     def traffic_cb(self, msg):
@@ -86,6 +90,7 @@ class TLDetector(object):
         """
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
+        self.img_cnt += 1
 
         ##
         # Publish upcoming red lights at camera frequency.
@@ -127,16 +132,23 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
         """
 
-        if TESTING:
+        #if TESTING:
+        #    return light.state
+        #else:  # for realz
+
+        if not self.camera_image:
+            # Not used anywhere else: self.prev_light_loc = None
+            return TrafficLight.UNKNOWN
+
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        if CAPTURE_IMAGES and (self.img_cnt % 25 == 0 ) :
+            img_fname = "/home/student/images/%d_%s.png" % (light.state, dt.datetime.now().strftime("%s_%f"))
+            cv2.imwrite( img_fname, cv_image )
+
+        if TESTING : 
             return light.state
-        else:  # for realz
-
-            if not self.camera_image:
-                # Not used anywhere else: self.prev_light_loc = None
-                return TrafficLight.UNKNOWN
-
-            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
+        else :
             return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):

@@ -86,9 +86,14 @@ class DBWNode(object):
     def loop(self):
         "run in a loop"
         rate = rospy.Rate(50) # 50Hz
+        iter_cnt = 0 
         while not rospy.is_shutdown():
-            if ((self.cur_linear_vel is not None) and (self.dsrd_linear_vel is not None)
+            cur_vel = self.cur_linear_vel
+            dsrd_vel = self.dsrd_linear_vel 
+
+            if ( (cur_vel is not None) and (dsrd_vel is not None)
                 and (self.dsrd_angular_vel is not None)):
+
                 ( throttle, 
                   brake, 
                   steering ) = self.controller.control(self.cur_linear_vel,
@@ -96,10 +101,16 @@ class DBWNode(object):
                                                        self.dsrd_linear_vel,
                                                        self.dsrd_angular_vel,
                                                        self.dbw_enabled)
+                if iter_cnt % 25 == 0 :
+                    rospy.loginfo("cur_vel= %.1f m/s (%.1f km/h) desired_vel=%.2f"
+                         " m/s  (%.1f km/h) throttle=%.3f " % (cur_vel, mps2kmph(cur_vel),
+                          dsrd_vel, mps2kmph(dsrd_vel), throttle))
+
                 if self.dbw_enabled :
                     self.publish( throttle, brake, steering )
             
             rate.sleep()
+            iter_cnt += 1 
 
     def dbw_enabled_cb( self, msg ) :
         "call back for dbw_enable flag message"
@@ -134,6 +145,7 @@ class DBWNode(object):
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
-
+def mps2kmph( mps ) :
+    return (mps * 3600) / 1000.0
 if __name__ == '__main__':
     DBWNode()

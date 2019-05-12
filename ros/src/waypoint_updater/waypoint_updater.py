@@ -71,8 +71,9 @@ class WaypointUpdater(object):
         rate = rospy.Rate(50)
         iter_cnt = 0
         while not rospy.is_shutdown():
-            rospy.loginfo("start of loop pose=%s waypoints=%s" % 
-                          (self.pose is not None, self.waypoints_msg))
+            if iter_cnt % 25 == 0 :
+                rospy.loginfo("wp_updater: iter_cnt=%d start of loop pose=%s" % 
+                              (iter_cnt, self.pose is not None) )
             if self.pose and self.waypoints_msg:
                 closest_wp_idx = self.get_closest_wp_idx()
                 lane = self.make_lane( closest_wp_idx )
@@ -97,7 +98,7 @@ class WaypointUpdater(object):
 
         if val > 0:
             closest_idx = (closest_idx + 1) % len( self.waypoints_2d )
-        print("get_closest_idx => %d", closest_idx)
+        # print("get_closest_idx => %d", closest_idx)
         return closest_idx
 
     def pose_cb(self, msg):
@@ -119,7 +120,8 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         """if a traffic light is nearby..."""
-        self.obstacle_wp_idx = msg.data
+        self.obstacle_wp_idx = msg.data if msg.data != -1 else None
+        
 
     def obstacle_cb(self, msg):
         """if an obstacle is nearby"""
@@ -150,6 +152,7 @@ def decelerate( wps, closest_idx, obstacle_wp_idx ):
         new_wp = Waypoint()
         new_wp.pose = wp.pose
         new_wp.twist.twist.linear.x = wp.twist.twist.linear.x
+        return new_wp
 
     ret = [ copy_waypoint_pose(wp) for wp in wps ]
 
