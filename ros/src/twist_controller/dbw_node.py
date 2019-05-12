@@ -23,8 +23,6 @@ that we have created in the `__init__` function.
 
 '''
 
-import math
-
 import rospy
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd # , SteeringReport
@@ -89,7 +87,8 @@ class DBWNode(object):
         "run in a loop"
         rate = rospy.Rate(50) # 50Hz
         while not rospy.is_shutdown():
-            if self.cur_linear_vel and self.dsrd_linear_vel and self.dsrd_angular_vel:
+            if ((self.cur_linear_vel is not None) and (self.dsrd_linear_vel is not None)
+                and (self.dsrd_angular_vel is not None)):
                 ( throttle, 
                   brake, 
                   steering ) = self.controller.control(self.cur_linear_vel,
@@ -108,13 +107,13 @@ class DBWNode(object):
 
     def twist_cb( self, msg ) :
         "callback for twist cmd message"
-        self.dsrd_linear_vel = msg.twist.linear
-        self.dsrd_angular_vel = msg.twist.angular
+        self.dsrd_linear_vel = msg.twist.linear.x
+        self.dsrd_angular_vel = msg.twist.angular.z
     
     def current_vel_cb( self, msg ) :
         "callback for current vel message"
-        self.cur_linear_vel = msg.twist.linear
-        self.cur_angular_vel = msg.twist.angular
+        self.cur_linear_vel = msg.twist.linear.x
+        self.cur_angular_vel = msg.twist.angular.z
 
     def publish(self, throttle, brake, steer):
         "publish throttle, brake and steer commands, each to their corrresponding topics"

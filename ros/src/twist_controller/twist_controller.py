@@ -70,6 +70,7 @@ class Controller(object):
             brake = abs(decel) * self.vehicle_mass * self.wheel_radius
 
         return throttle, brake, steering
+        #return 1.0, 0.0, 1.0 
 
     def show( self ) :
         """Another method to make pylint happy"""

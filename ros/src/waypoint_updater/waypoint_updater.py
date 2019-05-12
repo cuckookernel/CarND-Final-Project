@@ -61,7 +61,7 @@ class WaypointUpdater(object):
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         self.pose = None
-        self.waypoints = None
+        self.waypoints_msg = None
         self.waypoints_2d = []
         self.waypoint_tree = None
 
@@ -71,8 +71,11 @@ class WaypointUpdater(object):
         "run"
         rate = rospy.Rate(50)
         while not rospy.is_shutdown() :
-            if self.pose and self.waypoints:
-                self.closest_wp_idx = self.get_closest_wp_idx()
+            rospy.loginfo("start of loop pose=%s waypoints=%s" % 
+                          (self.pose is not None, self.waypoints_msg))
+            if self.pose and self.waypoints_msg:
+                closest_wp_idx = self.get_closest_wp_idx()
+                self.publish_waypoints( closest_wp_idx )
             rate.sleep()
 
     def get_closest_wp_idx(self) :
@@ -88,7 +91,7 @@ class WaypointUpdater(object):
 
         if val > 0 :
             closest_idx = (closest_idx + 1) % len( self.waypoints_2d )
-
+        print("get_closest_idx => %d", closest_idx)
         return closest_idx
         
 
@@ -96,23 +99,28 @@ class WaypointUpdater(object):
         """Publish the first LOOKAHEAD_WPS"""
 
         lane = Lane() 
-        lane.header = self.waypoints.header
-        lane.waypoints = self.waypoints[ closest_idx : closest_idx + LOOKAHEAD_WPS]
+        lane.header = self.waypoints_msg.header
+        lane.waypoints = self.waypoints_msg.waypoints[ 
+                            closest_idx : closest_idx + LOOKAHEAD_WPS]
+        rospy.loginfo( "Publishing %d waypoints, closest_idx = %d\n%s" % 
+                       (len(lane.waypoints), closest_idx, dir(Lane)) )
         self.final_waypoints_pub.publish( lane )
 
     def pose_cb(self, msg):
         """Update the pose"""
+        #rospy.loginfo("pose_cb")
+        
         self.pose = msg
 
-    def waypoints_cb(self, msg):
+    def waypoints_cb(self, waypoints_msg):
         """ waypoints contains all waypoint in the track both before and after vehicle """
         
-        self.waypoints = msg.waypoints
-        print( "received waypoints: %d " % (len(self.waypoints)) )
+        self.waypoints_msg = waypoints_msg
+        rospy.loginfo( "received waypoints: %d " % (len(self.waypoints_msg.waypoints)) )
         if not self.waypoint_tree :
             self.waypoints_2d = [[waypoint.pose.pose.position.x,
                                   waypoint.pose.pose.position.y]
-                                 for waypoint in self.waypoints]
+                                 for waypoint in self.waypoints_msg.waypoints]
             self.waypoint_tree = KDTree( self.waypoints_2d )
 
     def traffic_cb(self, msg):
