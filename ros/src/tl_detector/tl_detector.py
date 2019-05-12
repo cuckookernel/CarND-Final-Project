@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Detect and classify upcoming traffic lights"""
-#pylint: disable=bad-whitespace, trailing-whitespace
+# pylint: disable=bad-whitespace, trailing-whitespace
 from scipy.spatial import KDTree
 
 import rospy
@@ -17,6 +17,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 TESTING = True
+
 
 class TLDetector(object):
     """Main purpose is to send messages of /traffic_waypoint topic 
@@ -124,15 +125,15 @@ class TLDetector(object):
 
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
         """
+
         if TESTING:
             return light.state
-        else: # for realz
+        else:  # for realz
 
             if not self.camera_image:
                 # Not used anywhere else: self.prev_light_loc = None
-                return False
+                return TrafficLight.UNKNOWN
 
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
@@ -163,15 +164,16 @@ class TLDetector(object):
                 wp_idx = self.get_closest_waypoint(line[0], line[1])
                 
                 offset = wp_idx - car_wp_idx
-                if offset >= 0 and offset < best_offset :
+                if (offset >= 0) and (offset < best_offset):
                     best_offset = offset
                     closest_light = light
                     line_wp_idx = wp_idx
 
-        if closest_light :
+        if closest_light:
             return line_wp_idx, self.get_light_state(closest_light)
         else:
             return -1, TrafficLight.UNKNOWN
+
 
 if __name__ == '__main__':
     try:
