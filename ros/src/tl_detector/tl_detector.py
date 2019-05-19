@@ -68,6 +68,7 @@ class TLDetector(object):
             rospy.loginfo( 'Done loading tf model' )
             # self.listener = tf.TransformListener()
         else:
+            self.session=None
             self.light_classifier = TLClassifier()
 
 
