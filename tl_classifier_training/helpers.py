@@ -6,6 +6,7 @@ Created on Fri Dec 28 08:48:41 2018
 """
 import os
 import time
+import math
 import pickle
 
 import tensorflow as tf
@@ -15,16 +16,10 @@ import pandas as pd
 
 from hashlib import md5
 
-import helpers as h
-
 import architectures as arch
 
 from tensorflow.contrib.layers import flatten, variance_scaling_initializer
 
-# W_INIT_STDDEV = 0.01
-#def make_W_v0( shape ) :
-#    init = tf.truncated_normal( shape, stddev= W_INIT_STDDEV, dtype=tf.float32 )
-#    return tf.Variable( init )
 
 def load_imgs(a_dir, resize_wh=(200, 150)):
     f_names = os.listdir(a_dir)
@@ -61,7 +56,7 @@ def split_train_valid( X, y, frac_train ):
     train_mask = np.zeros( N, dtype=bool )
     train_mask[train_idxs] = 1
 
-    data = {}
+    data = dict()
     data['X_train'], data['y_train'] = X[train_mask], y[train_mask]
     data['X_valid'], data['y_valid'] = X[~train_mask], y[~train_mask]
 
@@ -100,21 +95,15 @@ def preproc_ls_1( img ):
 
     edges_s = cv2.Canny(s, 100, 200)
 
-    ret = [img, l.reshape((h,w,1)) , s.reshape((h,w,1)), edges_s.reshape((h, w, 1)) ]
+    ret = [img, l.reshape((h, w, 1)) , s.reshape((h, w, 1)), edges_s.reshape((h, w, 1)) ]
     return np.concatenate( ret, axis=2 )
 
 
 def preproc_ls( X ):
     X_hs   = np.stack( [preproc_ls_1( img ) for img in X], axis=0)
-    X_mean = X_hs.mean( axis=(1,2), keepdims=True )
-    X_std  = X_hs.std( axis=(1,2),  keepdims=True )
-    return  (X_hs - X_mean) / (X_std + 1e-6)
-
-
-def normalize_mean_std( X ):
-    Xmean = X.mean( axis=(1,2,3), keepdims=True )
-    Xstd  = X.std( axis=(1,2,3), keepdims=True )
-    return (X - Xmean) / Xstd
+    X_mean = X_hs.mean( axis=(1, 2), keepdims=True )
+    X_std  = X_hs.std( axis=(1, 2),  keepdims=True )
+    return (X_hs - X_mean) / (X_std + 1e-6)
 
 
 def make_W( shape, name ) :
@@ -137,7 +126,7 @@ def conv_layer( input_, W, b, strides, padding, nonlinear, name=None ) :
     return nonlinear( x, name=name )
 
 
-def conv_layer_from_pars( input_, pars ) :
+def conv_layer_from_pars( input_, pars ):
     assert pars['type'] == 'conv2d'
 
     if 'W' in pars :
@@ -151,7 +140,7 @@ def conv_layer_from_pars( input_, pars ) :
         assert len(input_shape) == 4, "Invalid input_shape %s " % (input_shape,)
         in_depth = input_shape[-1]
 
-        W = make_W( (w,h, in_depth, out_depth ), name=pars["name"] + "_W" )
+        W = make_W( (w, h, in_depth, out_depth ), name=pars["name"] + "_W" )
         b = make_b( (out_depth,) )
 
     n_pars = get_n_pars_4( W ) + get_n_pars_1( b )
@@ -253,7 +242,7 @@ def build_network( placeholders, params ) :
         elif pars["type"] == "dropout" :
             n, layer = dropout_from_pars( prev, pars, placeholders )
         else:
-            assert False, "Don't know type {pt}".format(pt =pars['type'])
+            assert False, "Don't know type {pt}".format(pt=pars['type'])
 
         # print( "{i:2d} {pars['name']:12s} {pars['type']:15s} "
         #        " {str(layer.shape.as_list()[1:]):16s} #params: {n:7d}")
@@ -361,7 +350,7 @@ def build_from_ckpt( X, y, n_classes, ckpt_fname, hyp_pars ) :
     saver = tf.train.Saver()
 
     with tf.Session() as sess :
-        saver.restore(sess, "/tmp/model.ckpt")
+        saver.restore(sess, ckpt_fname )  # "/tmp/model.ckpt")
 
         return sess.run( tnsr["accuracy"], feed_dict={ tnsr["input"]: X,
                                                        tnsr["y_true_idx"] : y,
@@ -376,14 +365,15 @@ def run_epoch( sess, epoch, data, tnsr, hyp_pars, log_pars ):
     total_tr_acc_ep = 0.
 
     def valid_accuracy_cb( ) :
-        sess = tf.get_default_session()
-        return sess.run( tnsr["accuracy"],
-                         feed_dict={ tnsr["input"]      : data["X_valid"],
-                                     tnsr["y_true_idx"] : data["y_valid"],
-                                     tnsr["keep_prob"]  : 1.} )
+        sess_ = tf.get_default_session()
+        return sess_.run( tnsr["accuracy"],
+                          feed_dict={ tnsr["input"]      : data["X_valid"],
+                                      tnsr["y_true_idx"] : data["y_valid"],
+                                      tnsr["keep_prob"]  : 1.} )
 
+    batch = 0
     for batch_x, batch_y, batch in \
-            h.batches_generator( X_train, y_train, batch_size, verbose=(epoch==0) ) :
+            batches_generator( X_train, y_train, batch_size, verbose=(epoch == 0) ) :
 
         feed_dict = { tnsr["input"]      : batch_x,
                       tnsr["y_true_idx"] : batch_y,
@@ -392,15 +382,14 @@ def run_epoch( sess, epoch, data, tnsr, hyp_pars, log_pars ):
         _, loss_v, train_accu = sess.run( [tnsr["optimizer"],
                                            tnsr["loss"],
                                            tnsr["accuracy"] ],
-                                           feed_dict=feed_dict)
+                                          feed_dict=feed_dict)
         total_loss_epoch += loss_v
         total_tr_acc_ep += train_accu
 
-        h.progress_log( epoch, batch, loss_v,
-                        print_loss_every=log_pars["print_loss_every"],
-                        run_valid_every=log_pars["run_valid_every"],
-                        accuracy_cb=valid_accuracy_cb )
-
+        progress_log( epoch, batch, loss_v,
+                      print_loss_every=log_pars["print_loss_every"],
+                      run_valid_every=log_pars["run_valid_every"],
+                      accuracy_cb=valid_accuracy_cb )
 
     avg_loss_epoch = total_loss_epoch / ( batch + 1 )
     avg_tr_accu_epoch = total_tr_acc_ep / ( batch + 1 )
@@ -423,10 +412,7 @@ def build_network_and_metrics( X_shape, n_classes, netw_arch, hyp_pars ) :
             "y_true"     : tf.one_hot( y_true_idx, n_classes )
         }
 
-        #PENDING: add drop-out
-        #keep_prob = tf.placeholder(tf.float32)
-
-        tnsr = h.build_network( place_holders, netw_arch )
+        tnsr = build_network( place_holders, netw_arch )
 
     logits = tnsr["logits"]
 
@@ -434,7 +420,7 @@ def build_network_and_metrics( X_shape, n_classes, netw_arch, hyp_pars ) :
         # Define loss and optimizer
         softmax_x_entropy = tf.nn.softmax_cross_entropy_with_logits
         tnsr["loss"] = tf.reduce_mean(softmax_x_entropy(logits=logits,
-                                                labels=tnsr["y_true"]))
+                                                        labels=tnsr["y_true"]))
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize( cost )
         lr = hyp_pars["learning_rate"]
         tnsr["optimizer"] = ( tf.train.AdamOptimizer( learning_rate=lr )
@@ -446,21 +432,24 @@ def build_network_and_metrics( X_shape, n_classes, netw_arch, hyp_pars ) :
 
     return tnsr
 
-def make_hyp_par_dicts( lattice_specs ) :
+
+def make_hyp_par_dicts( lattice_specs ):
     from itertools import product
 
     par_names = [ tup[0] for tup in lattice_specs ]
     iters = [ tup[1] for tup in lattice_specs ]
 
-    return  [ dict(zip(par_names,comb))
-              for comb in product( *iters ) ]
+    return [ dict(zip(par_names, comb))
+             for comb in product( *iters ) ]
 
-def to_pickle( obj, fname ) :
-    with open( fname, "wb") as f_out :
+
+def to_pickle( obj, fname ):
+    with open( fname, "wb") as f_out:
         print( "Writing to " + fname )
         pickle.dump( obj, f_out )
 
-def md5_digest_from_pars( hyp_pars, digest_len = 8) :
+
+def md5_digest_from_pars( hyp_pars, digest_len=8) :
     hyp_pars_str = str( sorted( list( hyp_pars.items() ) ) )
     md5_dig = md5( hyp_pars_str.encode("utf8") ).hexdigest()[:digest_len]
     out_path = "experiment_results/exp_" + md5_dig + ".pkl"
