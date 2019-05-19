@@ -18,7 +18,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 TESTING = True
-CAPTURE_IMAGES = True
+CAPTURE_IMAGES = False
 
 
 class TLDetector(object):

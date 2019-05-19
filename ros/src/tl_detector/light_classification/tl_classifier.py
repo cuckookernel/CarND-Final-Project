@@ -3,8 +3,8 @@
 import numpy as np
 import tensorflow as tf
 import cv2
-import tl_classifier_training.helpers as h
-from tl_classifier_training.train_tl_classifier import ARCH_3_3_TL
+import helpers as h
+from train_tl_classifier import ARCH_3_3_TL
 
 class TLClassifier(object):
     def __init__(self, sess, ckpt_path, img_wh):
