@@ -20,7 +20,27 @@ from hashlib import md5
 from tensorflow.contrib.layers import flatten, variance_scaling_initializer
 
 
-def load_imgs(a_dir, resize_wh=(200, 150)):
+def augment_transl(img0, n_augments, translate_aug_frac):
+    ret = []
+
+    h, w, _ = img0.shape
+    hf, wf = h * translate_aug_frac, w * translate_aug_frac
+
+    ret.extend([img0, img0[:, ::-1, :]])
+
+    for i in range(n_augments - 1):
+        M = np.float32([[1, 0, np.random.randint(wf)],
+                        [0, 1, np.random.randint(hf)]])
+
+        dst1 = cv2.warpAffine(img0, M, (w, h))
+        dst2 = img0[:, :: -1, :]
+
+        ret.extend([dst1, dst2])
+
+    return ret
+
+
+def load_imgs(a_dir, resize_wh=(200, 150), hue_only=False, translate_aug_frac=0.1):
     f_names = os.listdir(a_dir)
 
     ret_arr = []
@@ -30,20 +50,25 @@ def load_imgs(a_dir, resize_wh=(200, 150)):
         if f_name[-4:] != '.png':
             continue
         img = cv2.imread(a_dir + '/' + f_name)
+        if hue_only:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+
         img = cv2.resize(img, resize_wh)
-        ret_arr.append(img)
-        ret_arr.append(img[:, ::-1])  # horizontal reflection
 
         y_val = int(f_name[0])
         y_val = 3 if y_val == 4 else y_val
 
-        y_vals.extend([y_val, y_val])
+        n_augments = 2 if y_val in (0, 3) else 15
+        augments = augment_transl(img, n_augments, translate_aug_frac)
 
-    print("Directory had %d files. Returning %d images " % (len(f_names), len(ret_arr)))
-    X = np.stack(ret_arr)
+        ret_arr.extend(augments)
 
-    return X, np.array(y_vals)
+        y_vals.extend([y_val] * len(augments))
 
+    print("directory had %d files. Returning %d images " % (len(f_names), len(ret_arr)))
+    X0 = np.stack(ret_arr)
+
+    return X0, np.array(y_vals)
 
 def split_train_valid( X, y, frac_train, seed=1337 ):
 
@@ -62,7 +87,7 @@ def split_train_valid( X, y, frac_train, seed=1337 ):
     return data
 
 
-def rename_no_light( no_light_dir):
+def rename_no_light_dir( no_light_dir):
     f_names = os.listdir( no_light_dir )
 
     assert no_light_dir[-8:] == "no_light"
@@ -287,7 +312,7 @@ MY_DEV = "/cpu:0" if os.name == "posix" else "/gpu:0"
 
 def run_training( data, netw_arch, hyp_pars, log_pars, n_epochs ):
     """builds network and metrics nodes and runs loop over epochs"""
-    import pandas as pd
+    # import pandas as pd
 
     X_train, y_train = data["X_train"], data["y_train"]
     # netw_arch = getattr( arch, hyp_pars["netw_arch_name"] )
@@ -326,14 +351,13 @@ def run_training( data, netw_arch, hyp_pars, log_pars, n_epochs ):
                                       'valid_accy': valid_accy} )
 
             if "save_prefix" in log_pars:
-                ckpt_fname = ( log_pars["save_prefix"] + "." +
-                               md5_digest_from_pars(hyp_pars)[0] + ".{epoch}.tf.ckpt".format(epoch=epoch) )
-                print( "Saving model checkpoint to: " + ckpt_fname )
+                ckpt_fname = log_pars["save_prefix"] + ".ckpt/".format(epoch=epoch)
+
+                print( "Saving model checkpoint to: %s/%s" % ( os.getcwd(), ckpt_fname) )
                 saver = tf.train.Saver()
                 saver.save( sess, ckpt_fname )
 
-            return pd.DataFrame( summary_recs )[['epoch', 'avg_loss',
-                                                 'avg_train_accy', 'valid_accy']]
+            return summary_recs # [['epoch', 'avg_loss', 'avg_train_accy', 'valid_accy']]
 
         except KeyboardInterrupt:
             print("evaluating accu on test: ")

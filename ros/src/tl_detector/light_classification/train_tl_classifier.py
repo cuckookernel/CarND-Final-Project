@@ -21,17 +21,15 @@ def main():
 
     X, mean, std = h.normalize_mean_std(X0)
 
-    print( "mean shape= %s " % (mean.shape,) )
-
-    with open( train_images_dir.split('/')[0] + ".mean_std.pkl", "wb" ) as f_out:
-        pickle.dump( {"mean" : mean, "std" : std}, f_out )
+    # print( "mean shape= %s " % (mean.shape,) )
+    # with open( train_images_dir.split('/')[0] + ".mean_std.pkl", "wb" ) as f_out:
+    #     pickle.dump( {"mean" : mean, "std" : std}, f_out )
 
     X = X.astype(np.float32)
 
     data = h.split_train_valid(X, y, frac_train=0.8)
 
     hyp_pars = {
-        # "netw_arch_name": "arch_3_3_tl",
         "learning_rate": 0.0005,
         "batch_size": 64,
         "keep_prob": 0.6
@@ -39,7 +37,7 @@ def main():
 
     log_pars = {"print_loss_every": 3,
                 "run_valid_every": 10,
-                "save_prefix" : os.environ['HOME'] + '/model' }
+                "save_prefix" : '/model_sim' }
 
     n_epochs = 10
 
