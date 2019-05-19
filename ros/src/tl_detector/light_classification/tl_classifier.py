@@ -31,13 +31,15 @@ class TLClassifier(object):
         """
         # print( img0.shape, img0.dtype )
         img = cv2.resize(img0, self.img_wh )
+        img = cv2.cvtColor( img, cv2.COLOR_BGR2HLS )
         img1 = ( (img - img.mean() )/ img.std() ).reshape( tuple( [1] + list(img.shape) ) )
 
         tnsr = self.tnsr
 
         logits = sess.run(tnsr["logits"], feed_dict={tnsr["input"]: img1,
-                                                     tnsr['keep_prob']: 1.})
+                                                     tnsr['keep_prob']: 1.})[0]
+
 
         pred_class = np.argmax( logits )
 
-        return pred_class if pred_class < 3 else 4
+        return (pred_class, logits) if pred_class < 3 else (4, logits)
