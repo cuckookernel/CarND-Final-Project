@@ -40,7 +40,12 @@ def augment_transl(img0, n_augments, translate_aug_frac):
     return ret
 
 
-def load_imgs(a_dir, resize_wh=(200, 150), hue_only=False, translate_aug_frac=0.1):
+def load_imgs(a_dir, resize_wh=(200, 150),
+              n_aug_03 = 5,
+              n_aug_12 = 15,
+              hue_only=False,
+              translate_aug_frac=0.15):
+
     f_names = os.listdir(a_dir)
 
     ret_arr = []
@@ -58,7 +63,7 @@ def load_imgs(a_dir, resize_wh=(200, 150), hue_only=False, translate_aug_frac=0.
         y_val = int(f_name[0])
         y_val = 3 if y_val == 4 else y_val
 
-        n_augments = 2 if y_val in (0, 3) else 15
+        n_augments = 5 if y_val in (0, 3) else 30
         augments = augment_transl(img, n_augments, translate_aug_frac)
 
         ret_arr.extend(augments)
@@ -350,19 +355,26 @@ def run_training( data, netw_arch, hyp_pars, log_pars, n_epochs ):
                                       'avg_train_accy': avg_tr_accy_epoch,
                                       'valid_accy': valid_accy} )
 
-            if "save_prefix" in log_pars:
-                ckpt_fname = log_pars["save_prefix"] + ".ckpt/".format(epoch=epoch)
-
-                print( "Saving model checkpoint to: %s/%s" % ( os.getcwd(), ckpt_fname) )
-                saver = tf.train.Saver()
-                saver.save( sess, ckpt_fname )
+            maybe_save_model( log_pars, sess )
 
             return summary_recs # [['epoch', 'avg_loss', 'avg_train_accy', 'valid_accy']]
 
         except KeyboardInterrupt:
+            maybe_save_model(log_pars, sess)
+
             print("evaluating accu on test: ")
+
             test_acc = eval_accuracy( sess, data["X_test"], data["y_test"] )
             print('Testing Accuracy: {:>6.4f}'.format(test_acc))
+
+
+def maybe_save_model( log_pars, sess ):
+    if "save_prefix" in log_pars:
+        ckpt_fname = log_pars["save_prefix"] + ".ckpt/" # .format(epoch=epoch)
+
+        print("Saving model checkpoint to: %s/%s" % (os.getcwd(), ckpt_fname))
+        saver = tf.train.Saver()
+        saver.save(sess, ckpt_fname)
 
 
 def build_from_ckpt( X, y, n_classes, ckpt_fname, hyp_pars ) :
