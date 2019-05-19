@@ -12,11 +12,10 @@ import pickle
 import tensorflow as tf
 import cv2
 import numpy as np
-import pandas as pd
 
 from hashlib import md5
 
-import architectures as arch
+# import architectures as arch
 
 from tensorflow.contrib.layers import flatten, variance_scaling_initializer
 
@@ -40,18 +39,18 @@ def load_imgs(a_dir, resize_wh=(200, 150)):
 
         y_vals.extend([y_val, y_val])
 
-    print("directory had %d files. Returning %d images " % (len(f_names), len(ret_arr)))
+    print("Directory had %d files. Returning %d images " % (len(f_names), len(ret_arr)))
     X = np.stack(ret_arr)
 
     return X, np.array(y_vals)
 
 
-def split_train_valid( X, y, frac_train ):
+def split_train_valid( X, y, frac_train, seed=1337 ):
 
     N = X.shape[0]
     n_train = int( math.floor( N * frac_train ) )
 
-    np.random.seed( 1337 )
+    np.random.seed( seed )
     train_idxs = np.random.choice( N, n_train, replace=False )
     train_mask = np.zeros( N, dtype=bool )
     train_mask[train_idxs] = 1
@@ -288,6 +287,7 @@ MY_DEV = "/cpu:0" if os.name == "posix" else "/gpu:0"
 
 def run_training( data, netw_arch, hyp_pars, log_pars, n_epochs ):
     """builds network and metrics nodes and runs loop over epochs"""
+    import pandas as pd
 
     X_train, y_train = data["X_train"], data["y_train"]
     # netw_arch = getattr( arch, hyp_pars["netw_arch_name"] )
