@@ -6,7 +6,20 @@ import cv2
 import helpers as h
 from train_tl_classifier import ARCH_3_3_TL
 
+
 class TLClassifier(object):
+    def __init__(self, sess, ckpt_path, img_wh):
+        """Builds a tensorflow graph and restores parameters from a checkpoint file"""
+        # tf.reset_default_graph()
+        pass
+
+    def get_classification(self, sess, img):
+        red_pxs = (img[:, :, 0] < 70) & (img[:, :, 1] < 70) & (img[:, :, 2] > 230)
+
+        return 0 if red_pxs.sum() > 90 else 4
+
+
+class TLClassifierDL(object):
     def __init__(self, sess, ckpt_path, img_wh):
         """Builds a tensorflow graph and restores parameters from a checkpoint file"""
         # tf.reset_default_graph()
