@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Detect and classify upcoming traffic lights"""
 # pylint: disable=bad-whitespace, trailing-whitespace
+import os
 import datetime as dt 
 from scipy.spatial import KDTree
 
@@ -17,7 +18,7 @@ import cv2
 import yaml
 
 STATE_COUNT_THRESHOLD = 3
-TESTING = True
+TESTING = False
 CAPTURE_IMAGES = False
 
 
@@ -53,8 +54,19 @@ class TLDetector(object):
                                                       queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
-        self.listener = tf.TransformListener()
+        if TESTING:
+            self.light_classifier = None
+        else:
+            import tensorflow as tf
+            self.session = tf.Session()
+            img_wh = 200, 150
+            ckpt_prefix = self.config['ckpt_prefix']
+            rospy.loginfo( 'ckpt_prefix=%s\npwd=%s', ckpt_prefix, os.getcwd() )
+            ckpt_path = ckpt_prefix
+            self.light_classifier = TLClassifier(self.session, ckpt_path, img_wh)
+            rospy.loginfo( 'Done loading tf model' )
+
+            #self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
@@ -149,7 +161,17 @@ class TLDetector(object):
         if TESTING : 
             return light.state
         else :
-            return self.light_classifier.get_classification(cv_image)
+            tfc, logits = self.light_classifier.get_classification(self.session, cv_image)
+            rospy.loginfo("tlc=%d logits=%s" % (tfc, logits) )
+
+            if tfc != light.state and self.img_cnt % 5 == 0:
+                img_fname = ( "/home/student/images/%d_err_%s.png" % 
+                              (light.state, dt.datetime.now().strftime("%s_%f")))
+                cv2.imwrite( img_fname, cv_image )
+
+
+            return tfc
+
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
