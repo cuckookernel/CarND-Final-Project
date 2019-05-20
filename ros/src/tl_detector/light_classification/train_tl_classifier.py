@@ -20,10 +20,15 @@ np.random.choice( 20, 8 )
 
 def main():
     # %%
-    train_images_dir = os.environ['HOME'] + '/_data/images/carnd-fp/imgs236'
+    if os.environ["USER"] == 'root':
+        train_images_dir = '/home/workspace/imgs236'
+        h.MY_DEV = '/gpu:0'
+    else:
+        train_images_dir = os.environ['HOME'] + '/_data/images/carnd-fp/imgs236'
+        h.MY_DEV = '/cpu:0'
 
-    X0, y = h.load_imgs('/Users/teo/_data/images/carnd-fp/imgs236/',
-                        n_aug_03=2, n_aug_12=15, hue_only=True)
+    X0, y = h.load_imgs( train_images_dir,
+                        n_aug_03=6, n_aug_12=15, hue_only=True)
     X, mean, std = h.normalize_mean_std(X0)
 
     print( X0.shape, y.shape )
@@ -132,3 +137,7 @@ ARCH_3_3_TL1 = [None,  # index=0 won't be used
 
                # layer 8 : fully_connected  - no relu afterwards
                {'type': 'fully_connected', 'out_dim': 4, 'nonlinear': None, 'name': 'logits'} ]
+
+
+if __name__ == '__main__' :
+    main()
