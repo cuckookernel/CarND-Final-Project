@@ -10,5 +10,5 @@ class TLClassifier(object):
     def get_classification(self, ignored, img):
         red_pxs = (img[:, :, 0] < 70) & (img[:, :, 1] < 70) & (img[:, :, 2] > 230)
 
-        return 0 if red_pxs.sum() > 90 else 4
+        return (0 if red_pxs.sum() > 90 else 4), 0
 
