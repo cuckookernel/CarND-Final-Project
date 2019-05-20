@@ -20,7 +20,7 @@ import yaml
 STATE_COUNT_THRESHOLD = 3
 TESTING = False
 CAPTURE_IMAGES = False
-
+USE_NN  = False
 
 class TLDetector(object):
     """Main purpose is to send messages of /traffic_waypoint topic 
@@ -56,17 +56,21 @@ class TLDetector(object):
         self.bridge = CvBridge()
         if TESTING:
             self.light_classifier = None
-        else:
+        elif USE_NN:
             import tensorflow as tf
+            from light_classification.tl_classifier_dl import TLClassifierDL
             self.session = tf.Session()
             img_wh = 200, 150
             ckpt_prefix = self.config['ckpt_prefix']
             rospy.loginfo( 'ckpt_prefix=%s\npwd=%s', ckpt_prefix, os.getcwd() )
             ckpt_path = ckpt_prefix
-            self.light_classifier = TLClassifier(self.session, ckpt_path, img_wh)
+            self.light_classifier = TLClassifierDL(self.session, ckpt_path, img_wh)
             rospy.loginfo( 'Done loading tf model' )
+            # self.listener = tf.TransformListener()
+        else:
+            self.light_classifier = TLClassifier()
 
-            #self.listener = tf.TransformListener()
+
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
