@@ -2,7 +2,7 @@
 
 
 class TLClassifier(object):
-    def __init__(self, sess, ckpt_path, img_wh):
+    def __init__(self):
         """Builds a tensorflow graph and restores parameters from a checkpoint file"""
         # tf.reset_default_graph()
         pass
