@@ -29,8 +29,8 @@ def augment_transl(img0, n_augments, translate_aug_frac):
     ret.extend([img0, img0[:, ::-1, :]])
 
     for i in range(n_augments - 1):
-        M = np.float32([[1, 0, np.random.randint(wf)],
-                        [0, 1, np.random.randint(hf)]])
+        M = np.float32([[1, 0, +np.random.randint(wf)],
+                        [0, 1, -np.random.randint(hf)]])
 
         dst1 = cv2.warpAffine(img0, M, (w, h))
         dst2 = img0[:, :: -1, :]
@@ -41,7 +41,7 @@ def augment_transl(img0, n_augments, translate_aug_frac):
 
 
 def load_imgs(a_dir, resize_wh=(200, 150),
-              n_aug_03 = 5,
+              n_aug_03 = 2,
               n_aug_12 = 15,
               hue_only=False,
               translate_aug_frac=0.15):
@@ -63,7 +63,7 @@ def load_imgs(a_dir, resize_wh=(200, 150),
         y_val = int(f_name[0])
         y_val = 3 if y_val == 4 else y_val
 
-        n_augments = 5 if y_val in (0, 3) else 30
+        n_augments = n_aug_03 if y_val in (0, 3) else n_aug_12
         augments = augment_transl(img, n_augments, translate_aug_frac)
 
         ret_arr.extend(augments)
@@ -93,6 +93,7 @@ def split_train_valid( X, y, frac_train, seed=1337 ):
 
 
 def rename_no_light_dir( no_light_dir):
+    cwd = os.getcwd()
     f_names = os.listdir( no_light_dir )
 
     assert no_light_dir[-8:] == "no_light"
@@ -107,7 +108,7 @@ def rename_no_light_dir( no_light_dir):
         new_name = "4" + f_name[1:]
         print( f_name, "=>", new_name)
         os.rename( f_name, new_name  )
-
+    os.chdir( cwd )
 
 def normalize_mean_std(X):
     Xmean = X.mean(axis=(1, 2, 3), keepdims=True)
